@@ -53,7 +53,7 @@ If you prefer not to use Igniter, add to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:pin_stripe, "~> 0.1"}
+    {:pin_stripe, "~> 0.2"}
   ]
 end
 ```
