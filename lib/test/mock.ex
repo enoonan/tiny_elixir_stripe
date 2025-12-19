@@ -443,19 +443,15 @@ defmodule PinStripe.Test.Mock do
   end
 
   def stub_read(entity, response_data) when is_atom(entity) do
-    case PinStripe.Client.entity_to_path(entity) do
-      {:ok, path} ->
-        stub(fn conn ->
-          if conn.method == "GET" and conn.request_path == "/v1#{path}" do
-            json(conn, response_data)
-          else
-            conn
-          end
-        end)
+    path = get_entity_path!(entity)
 
-      {:error, :unrecognized_entity_type} ->
-        raise ArgumentError, "Unrecognized entity type: #{inspect(entity)}"
-    end
+    stub(fn conn ->
+      if conn.method == "GET" and conn.request_path == "/v1#{path}" do
+        json(conn, response_data)
+      else
+        conn
+      end
+    end)
   end
 
   @doc """
@@ -487,19 +483,15 @@ defmodule PinStripe.Test.Mock do
       "Widget"
   """
   def stub_create(entity, response_data) when is_atom(entity) do
-    case PinStripe.Client.entity_to_path(entity) do
-      {:ok, path} ->
-        stub(fn conn ->
-          if conn.method == "POST" and conn.request_path == "/v1#{path}" do
-            json(conn, response_data)
-          else
-            conn
-          end
-        end)
+    path = get_entity_path!(entity)
 
-      {:error, :unrecognized_entity_type} ->
-        raise ArgumentError, "Unrecognized entity type: #{inspect(entity)}"
-    end
+    stub(fn conn ->
+      if conn.method == "POST" and conn.request_path == "/v1#{path}" do
+        json(conn, response_data)
+      else
+        conn
+      end
+    end)
   end
 
   @doc """
@@ -645,31 +637,36 @@ defmodule PinStripe.Test.Mock do
     end)
   end
 
+  def stub_error(:any, status, error_data) when is_integer(status) do
+    stub(fn conn ->
+      conn
+      |> Plug.Conn.put_status(status)
+      |> json(error_data)
+    end)
+  end
+
   def stub_error(entity, status, error_data) when is_atom(entity) and is_integer(status) do
-    case entity do
-      :any ->
-        stub(fn conn ->
-          conn
-          |> Plug.Conn.put_status(status)
-          |> json(error_data)
-        end)
+    path = get_entity_path!(entity)
 
-      _ ->
-        case PinStripe.Client.entity_to_path(entity) do
-          {:ok, path} ->
-            stub(fn conn ->
-              if conn.request_path == "/v1#{path}" do
-                conn
-                |> Plug.Conn.put_status(status)
-                |> json(error_data)
-              else
-                conn
-              end
-            end)
+    stub(fn conn ->
+      if conn.request_path == "/v1#{path}" do
+        conn
+        |> Plug.Conn.put_status(status)
+        |> json(error_data)
+      else
+        conn
+      end
+    end)
+  end
 
-          {:error, :unrecognized_entity_type} ->
-            raise ArgumentError, "Unrecognized entity type: #{inspect(entity)}"
-        end
+  # Private helper to get entity path and raise on error
+  defp get_entity_path!(entity) do
+    case PinStripe.Client.entity_to_path(entity) do
+      {:ok, path} ->
+        path
+
+      {:error, :unrecognized_entity_type} ->
+        raise ArgumentError, "Unrecognized entity type: #{inspect(entity)}"
     end
   end
 end

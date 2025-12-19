@@ -718,19 +718,17 @@ defmodule PinStripe.Test.Fixtures do
 
   # String-based fixtures (webhook events only - they have dots)
   defp generate_fixture(fixture_name, opts) when is_binary(fixture_name) do
-    cond do
-      String.contains?(fixture_name, ".") ->
-        generate_webhook_event(fixture_name, opts)
+    if String.contains?(fixture_name, ".") do
+      generate_webhook_event(fixture_name, opts)
+    else
+      raise """
+      Unknown fixture: #{fixture_name}
 
-      true ->
-        raise """
-        Unknown fixture: #{fixture_name}
-
-        Supported fixtures:
-          API Resources (atoms): :customer, :product, :price, :subscription, :invoice, :charge, :payment_intent, :refund
-          Webhook Events (strings): "customer.created", "invoice.paid", etc.
-          Errors (atoms): :error_400, :error_401, :error_402, :error_403, :error_404, :error_409, :error_424, :error_429, :error_500, :error_502, :error_503, :error_504
-        """
+      Supported fixtures:
+        API Resources (atoms): :customer, :product, :price, :subscription, :invoice, :charge, :payment_intent, :refund
+        Webhook Events (strings): "customer.created", "invoice.paid", etc.
+        Errors (atoms): :error_400, :error_401, :error_402, :error_403, :error_404, :error_409, :error_424, :error_429, :error_500, :error_502, :error_503, :error_504
+      """
     end
   end
 
