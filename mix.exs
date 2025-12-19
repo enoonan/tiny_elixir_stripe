@@ -1,7 +1,7 @@
 defmodule TinyElixirStripe.MixProject do
   use Mix.Project
 
-  @version "0.0.6"
+  @version "0.1.3"
   @source_url "https://github.com/enoonan/tiny-elixir-stripe"
 
   def project do
@@ -72,7 +72,7 @@ defmodule TinyElixirStripe.MixProject do
         "CHANGELOG.md": [title: "Changelog"]
       ],
       groups_for_modules: [
-        "Core": [
+        Core: [
           TinyElixirStripe,
           TinyElixirStripe.Client,
           TinyElixirStripe.WebhookHandler,
@@ -86,7 +86,7 @@ defmodule TinyElixirStripe.MixProject do
           Mix.Tasks.TinyElixirStripe.SyncWebhookHandlers,
           Mix.Tasks.TinyElixirStripe.UpdateSupportedEvents
         ],
-        "Internal": [
+        Internal: [
           TinyElixirStripe.ParsersWithRawBody,
           TinyElixirStripe.WebhookHandler.Dsl,
           TinyElixirStripe.WebhookHandler.Info

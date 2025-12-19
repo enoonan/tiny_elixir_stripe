@@ -203,13 +203,35 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp find_webhook_handler_module(igniter) do
-      # Search all .ex files in the project for modules using TinyElixirStripe.WebhookHandler
-      found_module =
+      # First search in rewrite buffer (for test environment and pending changes)
+      found_in_rewrite =
         igniter.rewrite
         |> Rewrite.sources()
         |> Enum.find_value(&find_handler_in_source/1)
 
-      {igniter, found_module}
+      case found_in_rewrite do
+        nil ->
+          # If not found in rewrite buffer, search filesystem
+          found_on_disk =
+            try do
+              lib_path =
+                Igniter.Project.Module.proper_location(
+                  igniter,
+                  Igniter.Project.Module.module_name_prefix(igniter)
+                )
+                |> Path.dirname()
+
+              Path.wildcard(Path.join([lib_path, "**", "*.ex"]))
+              |> Enum.find_value(&find_handler_in_file/1)
+            rescue
+              _ -> nil
+            end
+
+          {igniter, found_on_disk}
+
+        module ->
+          {igniter, module}
+      end
     end
 
     defp find_handler_in_source(source) do
@@ -225,10 +247,30 @@ if Code.ensure_loaded?(Igniter) do
       end
     end
 
+    defp find_handler_in_file(path) do
+      with true <- File.exists?(path),
+           {:ok, content} <- File.read(path),
+           true <- content =~ "use TinyElixirStripe.WebhookHandler",
+           [_, module_name] <- Regex.run(~r/defmodule\s+([\w.]+)/, content) do
+        Module.concat([module_name])
+      else
+        _ -> nil
+      end
+    end
+
     defp create_webhook_handler_module(igniter, module) do
-      Igniter.Project.Module.create_module(igniter, module, """
-      use TinyElixirStripe.WebhookHandler
-      """)
+      # Check if module already exists in the rewrite sources
+      case Igniter.Project.Module.find_module(igniter, module) do
+        {:ok, {igniter, _source, _zipper}} ->
+          # Module already exists (either on disk or in pending changes), return igniter unchanged
+          igniter
+
+        {:error, _} ->
+          # Module doesn't exist, create it
+          Igniter.Project.Module.create_module(igniter, module, """
+          use TinyElixirStripe.WebhookHandler
+          """)
+      end
     end
 
     defp handler_already_exists?(igniter, module, event) do

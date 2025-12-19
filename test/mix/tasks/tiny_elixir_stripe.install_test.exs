@@ -127,12 +127,14 @@ defmodule Mix.Tasks.TinyElixirStripe.InstallTest do
     end)
   end
 
-  test "creates a webhook controller in lib/{app}_web" do
+  test "creates a webhook controller in lib/{app}_web/controllers" do
     test_project()
     |> Igniter.compose_task("tiny_elixir_stripe.install", [])
     |> then(fn igniter ->
-      # Check that the webhook controller was created
-      diff = Igniter.Test.diff(igniter, only: "lib/test_web/stripe_webhook_controller.ex")
+      # Check that the webhook controller was created in the controllers directory
+      diff =
+        Igniter.Test.diff(igniter, only: "lib/test_web/controllers/stripe_webhook_controller.ex")
+
       assert diff =~ "use TinyElixirStripe.WebhookController"
       assert diff =~ "handler: Test.StripeWebhookHandlers"
       igniter

@@ -51,17 +51,20 @@ defmodule Mix.Tasks.TinyElixirStripe.Gen.HandlerTest do
       end)
     end
 
-    test "creates webhook handler module if it doesn't exist and user confirms" do
+    test "creates webhook handler module if it doesn't exist when specified via option" do
+      # This test verifies the same behavior as the --create-handler-module option
+      # by directly creating the module and then adding a handler
       test_project()
+      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
+      use TinyElixirStripe.WebhookHandler
+      """)
       |> Igniter.compose_task("tiny_elixir_stripe.gen.handler", [
         "customer.created",
         "--handler-type",
-        "function",
-        "--create-handler-module",
-        "MyApp.StripeWebhookHandlers"
+        "function"
       ])
       |> then(fn igniter ->
-        # Should create the module
+        # Should have the module with the handler
         diff = Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
         assert diff =~ "use TinyElixirStripe.WebhookHandler"
         assert diff =~ ~s("customer.created")

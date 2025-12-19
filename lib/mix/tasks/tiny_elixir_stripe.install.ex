@@ -55,7 +55,8 @@ if Code.ensure_loaded?(Igniter) do
     def info(_argv, _composing_task) do
       %Igniter.Mix.Task.Info{
         group: :tiny_elixir_stripe,
-        adds_deps: [],
+        # Omit version requirement to let Hex determine the latest version
+        adds_deps: [:tiny_elixir_stripe],
         installs: [],
         example: __MODULE__.Docs.example(),
         only: nil,
@@ -153,11 +154,23 @@ if Code.ensure_loaded?(Igniter) do
       web_module = Igniter.Libs.Phoenix.web_module(igniter)
       controller_module = Module.concat([web_module, "StripeWebhookController"])
 
+      # Determine the path for the controller in the controllers directory
+      path =
+        Igniter.Project.Module.proper_location(igniter, controller_module)
+        |> Path.dirname()
+        |> Path.join("controllers")
+        |> Path.join("stripe_webhook_controller.ex")
+
       # Create the controller
-      Igniter.Project.Module.create_module(igniter, controller_module, """
-      use TinyElixirStripe.WebhookController, 
-        handler: #{inspect(handler_module)}
-      """)
+      Igniter.Project.Module.create_module(
+        igniter,
+        controller_module,
+        """
+        use TinyElixirStripe.WebhookController, 
+          handler: #{inspect(handler_module)}
+        """,
+        path: path
+      )
     end
 
     # Get or create the handler module and return it
