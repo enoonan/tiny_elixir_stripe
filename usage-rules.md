@@ -415,7 +415,6 @@ This allows `Mock` functions to intercept Stripe API calls in tests.
 
 - `mix pin_stripe.install` - Install and configure PinStripe
 - `mix pin_stripe.gen.handler <event>` - Generate a handler for a specific event
-- `mix pin_stripe.set_webhook_path <path>` - Update the webhook route path
 - `mix pin_stripe.sync_webhook_handlers` - Sync handlers with Stripe (if using Spark introspection)
 
 ## Common Mistakes

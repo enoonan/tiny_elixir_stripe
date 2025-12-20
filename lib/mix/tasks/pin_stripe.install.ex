@@ -21,10 +21,12 @@ defmodule Mix.Tasks.PinStripe.Install.Docs do
     1. Replace Plug.Parsers with PinStripe.ParsersWithRawBody in your Phoenix endpoint
     2. Generate a StripeWebhookController in lib/{app}_web with example event handlers
     3. Add a webhook route to your router that points to the generated controller
-    4. Add :pin_stripe to import_deps in .formatter.exs for DSL formatting support
+    4. Configure the webhook_paths in config/runtime.exs
+    5. Add :pin_stripe to import_deps in .formatter.exs for DSL formatting support
 
     The ParsersWithRawBody plug caches the raw request body for webhook signature verification,
-    as required by Stripe's webhook security.
+    as required by Stripe's webhook security. The webhook path is configurable and supports
+    multiple endpoints.
 
     The generated controller automatically handles signature verification and dispatches events
     to handler functions you define using the `handle` DSL.
@@ -82,6 +84,7 @@ if Code.ensure_loaded?(Igniter) do
       |> create_webhook_controller()
       |> add_webhook_route(webhook_path)
       |> add_formatter_config()
+      |> configure_webhook_paths(webhook_path)
     end
 
     # Replace Plug.Parsers with PinStripe.ParsersWithRawBody in the Phoenix endpoint
@@ -232,6 +235,18 @@ if Code.ensure_loaded?(Igniter) do
           "Could not find a Phoenix router to modify. Please manually add the webhook route."
         )
       end
+    end
+
+    # Configure webhook paths in runtime.exs
+    # Always set as a list since the config key is plural
+    defp configure_webhook_paths(igniter, webhook_path) do
+      Igniter.Project.Config.configure_runtime_env(
+        igniter,
+        :prod,
+        :pin_stripe,
+        [:webhook_paths],
+        [webhook_path]
+      )
     end
   end
 else

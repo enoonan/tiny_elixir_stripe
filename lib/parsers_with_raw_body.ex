@@ -3,7 +3,7 @@ defmodule PinStripe.ParsersWithRawBody do
   A custom Plug.Parsers that caches the raw request body for webhook routes.
 
   This plug conditionally caches the raw body only for webhook endpoints
-  (default: /webhooks/stripe). For all other routes, it behaves like standard
+  configured in your application. For all other routes, it behaves like standard
   Plug.Parsers.
 
   The raw body is needed for webhook signature verification, as the signature
@@ -30,13 +30,44 @@ defmodule PinStripe.ParsersWithRawBody do
 
   ## Configuration
 
-  The default webhook path is `["webhooks", "stripe"]` which matches the URL
-  path `/webhooks/stripe`. This will be configurable via Igniter in future versions.
+  Configure webhook paths in your `config/runtime.exs` as a list:
+
+      config :pin_stripe,
+        webhook_paths: ["/webhooks/stripe"]
+
+  You can configure multiple webhook endpoints:
+
+      config :pin_stripe,
+        webhook_paths: ["/webhooks/stripe", "/webhooks/stripe_connect"]
+
+  If no configuration is provided, the default path `["/webhooks/stripe"]` will be used.
+
+  ## Multiple Webhook Endpoints
+
+  To add additional webhook endpoints:
+
+  1. Add the path to the `:webhook_paths` config (as shown above)
+  2. Create a new controller that uses `PinStripe.WebhookController`:
+
+      defmodule MyAppWeb.StripeConnectWebhookController do
+        use PinStripe.WebhookController
+
+        handle "account.updated", fn event ->
+          # Handle Connect events
+          :ok
+        end
+      end
+
+  3. Add the route in your router:
+
+      scope "/webhooks" do
+        post "/stripe_connect", MyAppWeb.StripeConnectWebhookController, :create
+      end
   """
 
   @behaviour Plug
 
-  @webhook_path ["webhooks", "stripe"]
+  @default_webhook_path "/webhooks/stripe"
 
   @doc false
   def init(opts) do
@@ -46,13 +77,40 @@ defmodule PinStripe.ParsersWithRawBody do
   end
 
   @doc false
-  def call(%{path_info: @webhook_path} = conn, {cache, _nocache}) do
-    Plug.Parsers.call(conn, cache)
+  def call(conn, {cache, nocache}) do
+    if webhook_path?(conn.path_info) do
+      Plug.Parsers.call(conn, cache)
+    else
+      Plug.Parsers.call(conn, nocache)
+    end
   end
 
-  def call(conn, {_cache, nocache}) do
-    Plug.Parsers.call(conn, nocache)
+  # Check if the current path matches any configured webhook paths
+  defp webhook_path?(path_info) do
+    configured_paths = get_webhook_paths()
+    Enum.any?(configured_paths, fn webhook_path -> path_info == webhook_path end)
   end
+
+  # Get configured webhook paths from application config
+  defp get_webhook_paths do
+    case Application.get_env(:pin_stripe, :webhook_paths) do
+      nil ->
+        # Default to standard webhook path
+        [path_to_path_info(@default_webhook_path)]
+
+      paths when is_list(paths) ->
+        Enum.map(paths, &path_to_path_info/1)
+    end
+  end
+
+  # Convert a string path like "/webhooks/stripe" to path_info format ["webhooks", "stripe"]
+  defp path_to_path_info(path) when is_binary(path) do
+    path
+    |> String.split("/", trim: true)
+  end
+
+  # Already in path_info format
+  defp path_to_path_info(path) when is_list(path), do: path
 
   @doc """
   Custom body reader that caches the raw request body.

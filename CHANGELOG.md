@@ -94,7 +94,6 @@ This is a **breaking change**. If you're upgrading from TinyElixirStripe:
 - `mix tiny_elixir_stripe.install` - Igniter-powered installation task
 - `mix tiny_elixir_stripe.gen.handler` - Generate webhook event handlers
 - `mix tiny_elixir_stripe.sync_webhook_handlers` - Sync handlers with Stripe dashboard
-- `mix tiny_elixir_stripe.set_webhook_path` - Change webhook endpoint path
 - `mix tiny_elixir_stripe.update_supported_events` - Update supported Stripe events list
 - Support for both function and module-based webhook handlers
 - CRUD operations for common Stripe entities (customers, subscriptions, products, prices, etc.)

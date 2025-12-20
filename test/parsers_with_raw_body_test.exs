@@ -1,5 +1,5 @@
 defmodule PinStripe.ParsersWithRawBodyTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   import Plug.Test
   import Plug.Conn
@@ -9,6 +9,22 @@ defmodule PinStripe.ParsersWithRawBodyTest do
   @webhook_path "/webhooks/stripe"
   @non_webhook_path "/api/customers"
   @json_payload ~s({"type":"customer.created","id":"evt_123"})
+
+  setup do
+    # Store original config
+    original_config = Application.get_env(:pin_stripe, :webhook_paths)
+
+    on_exit(fn ->
+      # Restore original config
+      if original_config do
+        Application.put_env(:pin_stripe, :webhook_paths, original_config)
+      else
+        Application.delete_env(:pin_stripe, :webhook_paths)
+      end
+    end)
+
+    :ok
+  end
 
   describe "init/1" do
     test "returns tuple of cached and non-cached parser options" do
@@ -165,6 +181,115 @@ defmodule PinStripe.ParsersWithRawBodyTest do
       {:ok, _body, updated_conn} = ParsersWithRawBody.cache_raw_body(conn, length: 1_000_000)
 
       assert Map.has_key?(updated_conn.assigns, :raw_body)
+    end
+  end
+
+  describe "configuration support" do
+    test "caches raw body when config has single path in list" do
+      Application.put_env(:pin_stripe, :webhook_paths, ["/webhooks/stripe"])
+      opts = ParsersWithRawBody.init(parsers: [:json], pass: ["*/*"], json_decoder: Jason)
+
+      conn =
+        conn(:post, "/webhooks/stripe", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn.assigns[:raw_body] != nil
+      raw_body = conn.assigns.raw_body |> Enum.reverse() |> IO.iodata_to_binary()
+      assert raw_body == @json_payload
+    end
+
+    test "caches raw body when config has multiple paths in list" do
+      Application.put_env(:pin_stripe, :webhook_paths, ["/webhooks/stripe", "/webhooks/connect"])
+      opts = ParsersWithRawBody.init(parsers: [:json], pass: ["*/*"], json_decoder: Jason)
+
+      # Test first path
+      conn1 =
+        conn(:post, "/webhooks/stripe", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn1.assigns[:raw_body] != nil
+
+      # Test second path
+      conn2 =
+        conn(:post, "/webhooks/connect", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn2.assigns[:raw_body] != nil
+    end
+
+    test "does not cache when path not in configured list" do
+      Application.put_env(:pin_stripe, :webhook_paths, ["/webhooks/stripe"])
+      opts = ParsersWithRawBody.init(parsers: [:json], pass: ["*/*"], json_decoder: Jason)
+
+      conn =
+        conn(:post, "/webhooks/other", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn.assigns[:raw_body] == nil
+    end
+
+    test "handles nested webhook paths" do
+      Application.put_env(:pin_stripe, :webhook_paths, ["/api/webhooks/stripe"])
+      opts = ParsersWithRawBody.init(parsers: [:json], pass: ["*/*"], json_decoder: Jason)
+
+      conn =
+        conn(:post, "/api/webhooks/stripe", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn.assigns[:raw_body] != nil
+    end
+
+    test "uses default path when no config present" do
+      Application.delete_env(:pin_stripe, :webhook_paths)
+      opts = ParsersWithRawBody.init(parsers: [:json], pass: ["*/*"], json_decoder: Jason)
+
+      conn =
+        conn(:post, "/webhooks/stripe", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn.assigns[:raw_body] != nil
+    end
+
+    test "does not cache when config is empty list" do
+      Application.put_env(:pin_stripe, :webhook_paths, [])
+      opts = ParsersWithRawBody.init(parsers: [:json], pass: ["*/*"], json_decoder: Jason)
+
+      conn =
+        conn(:post, "/webhooks/stripe", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn.assigns[:raw_body] == nil
+    end
+
+    test "handles paths with trailing slashes" do
+      Application.put_env(:pin_stripe, :webhook_paths, ["/webhooks/stripe/"])
+      opts = ParsersWithRawBody.init(parsers: [:json], pass: ["*/*"], json_decoder: Jason)
+
+      conn =
+        conn(:post, "/webhooks/stripe", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn.assigns[:raw_body] != nil
+    end
+
+    test "still parses JSON body for configured paths" do
+      Application.put_env(:pin_stripe, :webhook_paths, ["/custom/webhook"])
+      opts = ParsersWithRawBody.init(parsers: [:json], pass: ["*/*"], json_decoder: Jason)
+
+      conn =
+        conn(:post, "/custom/webhook", @json_payload)
+        |> put_req_header("content-type", "application/json")
+        |> ParsersWithRawBody.call(opts)
+
+      assert conn.body_params == %{"type" => "customer.created", "id" => "evt_123"}
     end
   end
 end

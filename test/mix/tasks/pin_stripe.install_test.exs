@@ -152,4 +152,64 @@ defmodule Mix.Tasks.PinStripe.InstallTest do
       igniter
     end)
   end
+
+  test "sets webhook_paths config with default path as list" do
+    test_project()
+    |> Igniter.compose_task("pin_stripe.install", [])
+    |> then(fn igniter ->
+      # Check that config/runtime.exs was created/modified
+      diff = Igniter.Test.diff(igniter, only: "config/runtime.exs")
+      assert diff =~ "webhook_paths"
+      # Should be a list
+      assert diff =~ "["
+      assert diff =~ "/webhooks/stripe"
+      assert diff =~ ":pin_stripe"
+      igniter
+    end)
+  end
+
+  test "sets webhook_paths config with custom path as list" do
+    test_project()
+    |> Igniter.compose_task("pin_stripe.install", ["--path", "/custom/webhook/endpoint"])
+    |> then(fn igniter ->
+      diff = Igniter.Test.diff(igniter, only: "config/runtime.exs")
+      assert diff =~ "webhook_paths"
+      # Should be a list
+      assert diff =~ "["
+      assert diff =~ "/custom/webhook/endpoint"
+      assert diff =~ ":pin_stripe"
+      igniter
+    end)
+  end
+
+  test "creates config/runtime.exs if it doesn't exist" do
+    test_project()
+    |> Igniter.compose_task("pin_stripe.install", [])
+    |> then(fn igniter ->
+      # Verify the file was created by checking diff
+      diff = Igniter.Test.diff(igniter, only: "config/runtime.exs")
+      assert diff =~ "Create: config/runtime.exs"
+      assert diff =~ "import Config"
+      igniter
+    end)
+  end
+
+  test "appends config to existing runtime.exs" do
+    test_project()
+    |> Igniter.create_new_file("config/runtime.exs", """
+    import Config
+
+    config :existing_app, some_key: "some_value"
+    """)
+    |> Igniter.compose_task("pin_stripe.install", [])
+    |> then(fn igniter ->
+      diff = Igniter.Test.diff(igniter, only: "config/runtime.exs")
+      # Should preserve existing config
+      assert diff =~ ":existing_app"
+      # Should add new config
+      assert diff =~ ":pin_stripe"
+      assert diff =~ "webhook_paths"
+      igniter
+    end)
+  end
 end
