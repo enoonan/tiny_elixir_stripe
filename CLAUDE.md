@@ -16,6 +16,18 @@ This is a non-negotiable requirement for this project. The workflow is:
 
 **Never implement functionality without a failing test first. No exceptions.**
 
+## 🚨 CRITICAL: GIT COMMIT GUIDELINES 🚨
+
+**NEVER add yourself (Claude) as a co-author or contributor to commits.**
+
+When creating commits:
+- Do NOT include `Co-Authored-By: Claude` or similar lines
+- Do NOT include "Generated with Claude Code" attribution
+- The repository owner is solely responsible for all code
+- You are a tool assisting with development, not a developer or contributor
+
+All commits must be authored by the human developer only.
+
 ## Important Reference Files
 
 ### AGENTS.md - Usage Rules Documentation
