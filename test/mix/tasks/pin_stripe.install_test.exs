@@ -93,41 +93,7 @@ defmodule Mix.Tasks.PinStripe.InstallTest do
     end)
   end
 
-  test "creates a webhook handler stub module in lib/{app}" do
-    test_project()
-    |> Igniter.compose_task("pin_stripe.install", [])
-    |> then(fn igniter ->
-      # Check that the webhook handler module was created
-      diff = Igniter.Test.diff(igniter, only: "lib/test/stripe_webhook_handlers.ex")
-      assert diff =~ "use PinStripe.WebhookHandler"
-      igniter
-    end)
-  end
-
-  test "does not create a duplicate webhook handler if one already exists" do
-    test_project()
-    |> Igniter.Project.Module.create_module(Test.ExistingHandler, """
-    use PinStripe.WebhookHandler
-
-    handle "customer.created", fn event ->
-      :ok
-    end
-    """)
-    |> Igniter.compose_task("pin_stripe.install", [])
-    |> then(fn igniter ->
-      # Check that no new webhook handler was created
-      diff = Igniter.Test.diff(igniter, only: "lib/test/stripe_webhook_handlers.ex")
-      assert diff == ""
-
-      # Verify the existing handler is still there
-      diff = Igniter.Test.diff(igniter, only: "lib/test/existing_handler.ex")
-      assert diff =~ "use PinStripe.WebhookHandler"
-      assert diff =~ "customer.created"
-      igniter
-    end)
-  end
-
-  test "creates a webhook controller in lib/{app}_web" do
+  test "creates a webhook controller in lib/{app}_web with example handlers" do
     test_project()
     |> Igniter.compose_task("pin_stripe.install", [])
     |> then(fn igniter ->
@@ -135,7 +101,9 @@ defmodule Mix.Tasks.PinStripe.InstallTest do
       diff = Igniter.Test.diff(igniter, only: "lib/test_web/stripe_webhook_controller.ex")
 
       assert diff =~ "use PinStripe.WebhookController"
-      assert diff =~ "handler: Test.StripeWebhookHandlers"
+      assert diff =~ "# Add your webhook event handlers here using the handle/2 macro"
+      assert diff =~ "# handle \"customer.created\", fn event ->"
+      assert diff =~ "# handle \"invoice.paid\", MyApp.InvoicePaidHandler"
 
       igniter
     end)

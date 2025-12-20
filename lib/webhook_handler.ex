@@ -3,6 +3,7 @@ defmodule PinStripe.WebhookHandler do
   Spark DSL for defining webhook handlers.
 
   This module provides a DSL for defining handlers for Stripe webhook events.
+  It is primarily used internally by `PinStripe.WebhookController`.
 
   ## Example
 

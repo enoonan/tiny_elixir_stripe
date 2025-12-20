@@ -59,11 +59,11 @@ defmodule PinStripe.ConfigurationTest do
     end
 
     test "WebhookController code expects :stripe_webhook_secret config key" do
-      # Read the webhook controller source to verify it uses the correct config key
-      controller_source = File.read!("lib/webhook_controller.ex")
+      # Read the transformer source to verify it uses the correct config key
+      transformer_source = File.read!("lib/webhook_handler/transformers/generate_handle_event.ex")
 
-      assert controller_source =~ ":stripe_webhook_secret"
-      refute controller_source =~ "webhook_signing_secret"
+      assert transformer_source =~ ":stripe_webhook_secret"
+      refute transformer_source =~ "webhook_signing_secret"
     end
   end
 

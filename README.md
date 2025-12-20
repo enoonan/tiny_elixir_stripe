@@ -33,10 +33,9 @@ mix igniter.install pin_stripe
 This will:
 1. Add the dependency to your `mix.exs`
 2. Replace `Plug.Parsers` with `PinStripe.ParsersWithRawBody` in your Phoenix endpoint (required for webhook signature verification)
-3. Create a `StripeWebhookHandlers` module for defining event handlers
-4. Generate a `StripeWebhookController` in your Phoenix app
-5. Add the webhook route to your router (default: `/webhooks/stripe`)
-6. Configure `.formatter.exs` for DSL formatting support
+3. Generate a `StripeWebhookController` in your Phoenix app with example event handlers
+4. Add the webhook route to your router (default: `/webhooks/stripe`)
+5. Configure `.formatter.exs` for DSL formatting support
 
 Then configure your Stripe credentials in `config/runtime.exs`:
 
@@ -88,26 +87,17 @@ plug PinStripe.ParsersWithRawBody,
   json_decoder: Jason
 ```
 
-2. **Create a webhook handler module** (`lib/my_app/stripe_webhook_handlers.ex`):
+2. **Create a webhook controller** (`lib/my_app_web/stripe_webhook_controller.ex`):
 
 ```elixir
-defmodule MyApp.StripeWebhookHandlers do
-  use PinStripe.WebhookHandler
+defmodule MyAppWeb.StripeWebhookController do
+  use PinStripe.WebhookController
 
   # Define your handlers here (see examples below)
 end
 ```
 
-3. **Create a webhook controller** (`lib/my_app_web/stripe_webhook_controller.ex`):
-
-```elixir
-defmodule MyAppWeb.StripeWebhookController do
-  use PinStripe.WebhookController,
-    handler: MyApp.StripeWebhookHandlers
-end
-```
-
-4. **Add the route** to your router (`lib/my_app_web/router.ex`):
+3. **Add the route** to your router (`lib/my_app_web/router.ex`):
 
 ```elixir
 scope "/webhooks" do
@@ -115,7 +105,7 @@ scope "/webhooks" do
 end
 ```
 
-5. **Add formatter config** to `.formatter.exs`:
+4. **Add formatter config** to `.formatter.exs`:
 
 ```elixir
 [
@@ -133,11 +123,11 @@ PinStripe provides a clean DSL for handling webhook events. When Stripe sends a 
 
 ### Function Handlers
 
-Define inline handlers for simple event processing:
+Define inline handlers for simple event processing directly in your controller:
 
 ```elixir
-defmodule MyApp.StripeWebhookHandlers do
-  use PinStripe.WebhookHandler
+defmodule MyAppWeb.StripeWebhookController do
+  use PinStripe.WebhookController
 
   handle "customer.created", fn event ->
     customer_id = event["data"]["object"]["id"]
@@ -163,11 +153,11 @@ end
 
 ### Module Handlers
 
-For more complex event processing, use separate modules:
+For more complex event processing, use separate handler modules:
 
 ```elixir
-defmodule MyApp.StripeWebhookHandlers do
-  use PinStripe.WebhookHandler
+defmodule MyAppWeb.StripeWebhookController do
+  use PinStripe.WebhookController
 
   handle "customer.subscription.created", MyApp.StripeWebhookHandlers.SubscriptionCreated
   handle "customer.subscription.updated", MyApp.StripeWebhookHandlers.SubscriptionUpdated
@@ -214,7 +204,7 @@ mix pin_stripe.gen.handler charge.succeeded --handler-type module --module MyApp
 
 The generator will:
 - Validate the event name against supported Stripe events
-- Create the handler in your `WebhookHandler` module
+- Add the handler to your `WebhookController`
 - Generate a separate module file for module handlers
 
 ### Syncing with Stripe

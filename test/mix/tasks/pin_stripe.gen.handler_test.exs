@@ -20,8 +20,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
     test "accepts valid Stripe event names" do
       # Should not raise
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "customer.created",
@@ -34,8 +34,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
   describe "webhook handler module" do
     test "finds existing webhook handler module" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "customer.created",
@@ -44,7 +44,7 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       ])
       |> then(fn igniter ->
         # Should modify the existing module, not create a new one
-        diff = Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+        diff = Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
         assert diff =~ ~s("customer.created")
         assert diff =~ ~s(fn event ->)
         igniter
@@ -55,8 +55,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       # This test verifies the same behavior as the --create-handler-module option
       # by directly creating the module and then adding a handler
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "customer.created",
@@ -65,8 +65,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       ])
       |> then(fn igniter ->
         # Should have the module with the handler
-        diff = Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
-        assert diff =~ "use PinStripe.WebhookHandler"
+        diff = Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
+        assert diff =~ "use PinStripe.WebhookController"
         assert diff =~ ~s("customer.created")
         assert diff =~ ~s(fn event ->)
         igniter
@@ -77,8 +77,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
   describe "function handler generation" do
     test "generates function handler stub" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "customer.created",
@@ -86,7 +86,7 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
         "function"
       ])
       |> then(fn igniter ->
-        diff = Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+        diff = Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
         assert diff =~ ~s("customer.created")
         assert diff =~ ~s(fn event ->)
         assert diff =~ "# Handle customer.created event"
@@ -97,8 +97,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
 
     test "generates function handler for event with multiple dots" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "checkout.session.completed",
@@ -106,7 +106,7 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
         "function"
       ])
       |> then(fn igniter ->
-        diff = Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+        diff = Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
         assert diff =~ ~s("checkout.session.completed")
         assert diff =~ ~s(fn event ->)
         assert diff =~ "# Handle checkout.session.completed event"
@@ -118,8 +118,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
   describe "module handler generation" do
     test "generates module handler stub with default location" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "customer.created",
@@ -129,18 +129,18 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       |> then(fn igniter ->
         # Should add handle call to webhook handler module
         handler_diff =
-          Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+          Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
 
         assert handler_diff =~ ~s("customer.created")
-        assert handler_diff =~ "MyApp.StripeWebhookHandlers.CustomerCreated"
+        assert handler_diff =~ "Test.StripeWebhookHandlers.CustomerCreated"
 
         # Should create the handler module
         module_diff =
           Igniter.Test.diff(igniter,
-            only: "lib/my_app/stripe_webhook_handlers/customer_created.ex"
+            only: "lib/test/stripe_webhook_handlers/customer_created.ex"
           )
 
-        assert module_diff =~ "defmodule MyApp.StripeWebhookHandlers.CustomerCreated"
+        assert module_diff =~ "defmodule Test.StripeWebhookHandlers.CustomerCreated"
         assert module_diff =~ "def handle_event(event)"
         assert module_diff =~ "# Handle customer.created event"
         assert module_diff =~ ":ok"
@@ -150,8 +150,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
 
     test "generates module handler with correct naming for multi-part events" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "checkout.session.completed",
@@ -161,18 +161,18 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       |> then(fn igniter ->
         # Should add handle call
         handler_diff =
-          Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+          Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
 
         assert handler_diff =~ ~s("checkout.session.completed")
-        assert handler_diff =~ "MyApp.StripeWebhookHandlers.CheckoutSessionCompleted"
+        assert handler_diff =~ "Test.StripeWebhookHandlers.CheckoutSessionCompleted"
 
         # Should create module with correct name
         module_diff =
           Igniter.Test.diff(igniter,
-            only: "lib/my_app/stripe_webhook_handlers/checkout_session_completed.ex"
+            only: "lib/test/stripe_webhook_handlers/checkout_session_completed.ex"
           )
 
-        assert module_diff =~ "defmodule MyApp.StripeWebhookHandlers.CheckoutSessionCompleted"
+        assert module_diff =~ "defmodule Test.StripeWebhookHandlers.CheckoutSessionCompleted"
         assert module_diff =~ "# Handle checkout.session.completed event"
         igniter
       end)
@@ -180,8 +180,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
 
     test "generates module handler with custom module name" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "customer.created",
@@ -193,7 +193,7 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       |> then(fn igniter ->
         # Should add handle call with custom module
         handler_diff =
-          Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+          Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
 
         assert handler_diff =~ ~s("customer.created")
         assert handler_diff =~ "MyApp.CustomHandlers.NewCustomer"
@@ -211,8 +211,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
   describe "handle call placement" do
     test "adds handle call to existing webhook handler module" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
 
       handle "charge.succeeded", fn event ->
         # Existing handler
@@ -225,7 +225,7 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
         "function"
       ])
       |> then(fn igniter ->
-        diff = Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+        diff = Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
         # Should have both handlers
         assert diff =~ ~s("charge.succeeded")
         assert diff =~ ~s("customer.created")
@@ -235,8 +235,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
 
     test "does not duplicate handler for same event" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
 
       handle "customer.created", fn event ->
         # Existing handler
@@ -253,8 +253,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
 
     test "does not confuse documentation examples for actual handlers" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
 
       @moduledoc \"\"\"
       Example usage:
@@ -272,7 +272,7 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       ])
       |> then(fn igniter ->
         # Should successfully add the handler, not warn about duplication
-        diff = Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+        diff = Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
         assert diff =~ ~s("customer.created")
         assert diff =~ ~s(fn event ->)
 
@@ -286,8 +286,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
   describe "edge cases" do
     test "handles events with underscores" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "customer_cash_balance_transaction.created",
@@ -296,19 +296,19 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       ])
       |> then(fn igniter ->
         handler_diff =
-          Igniter.Test.diff(igniter, only: "lib/my_app/stripe_webhook_handlers.ex")
+          Igniter.Test.diff(igniter, only: "lib/my_app_web/stripe_webhook_controller.ex")
 
         assert handler_diff =~ ~s("customer_cash_balance_transaction.created")
-        assert handler_diff =~ "MyApp.StripeWebhookHandlers.CustomerCashBalanceTransactionCreated"
+        assert handler_diff =~ "Test.StripeWebhookHandlers.CustomerCashBalanceTransactionCreated"
 
         module_diff =
           Igniter.Test.diff(igniter,
             only:
-              "lib/my_app/stripe_webhook_handlers/customer_cash_balance_transaction_created.ex"
+              "lib/test/stripe_webhook_handlers/customer_cash_balance_transaction_created.ex"
           )
 
         assert module_diff =~
-                 "defmodule MyApp.StripeWebhookHandlers.CustomerCashBalanceTransactionCreated"
+                 "defmodule Test.StripeWebhookHandlers.CustomerCashBalanceTransactionCreated"
 
         igniter
       end)
@@ -316,8 +316,8 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
 
     test "handles v1 prefixed events" do
       test_project()
-      |> Igniter.Project.Module.create_module(MyApp.StripeWebhookHandlers, """
-      use PinStripe.WebhookHandler
+      |> Igniter.Project.Module.create_module(MyAppWeb.StripeWebhookController, """
+      use PinStripe.WebhookController
       """)
       |> Igniter.compose_task("pin_stripe.gen.handler", [
         "v1.billing.meter.error_report_triggered",
@@ -327,11 +327,11 @@ defmodule Mix.Tasks.PinStripe.Gen.HandlerTest do
       |> then(fn igniter ->
         module_diff =
           Igniter.Test.diff(igniter,
-            only: "lib/my_app/stripe_webhook_handlers/v1_billing_meter_error_report_triggered.ex"
+            only: "lib/test/stripe_webhook_handlers/v1_billing_meter_error_report_triggered.ex"
           )
 
         assert module_diff =~
-                 "defmodule MyApp.StripeWebhookHandlers.V1BillingMeterErrorReportTriggered"
+                 "defmodule Test.StripeWebhookHandlers.V1BillingMeterErrorReportTriggered"
 
         igniter
       end)

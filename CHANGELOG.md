@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-19
+
+### Changed
+
+**⚠️ BREAKING CHANGE**: Simplified webhook handler architecture
+
+Webhook event handlers are now defined directly in your `WebhookController` instead of a separate `WebhookHandler` module. This reduces indirection and simplifies the overall architecture.
+
+**Before (0.2.x)**:
+```elixir
+defmodule MyApp.StripeWebhookHandlers do
+  use PinStripe.WebhookHandler
+  
+  handle "customer.created", fn event -> ... end
+end
+
+defmodule MyAppWeb.StripeWebhookController do
+  use PinStripe.WebhookController,
+    handler: MyApp.StripeWebhookHandlers
+end
+```
+
+**After (0.3.0)**:
+```elixir
+defmodule MyAppWeb.StripeWebhookController do
+  use PinStripe.WebhookController
+  
+  handle "customer.created", fn event -> ... end
+end
+```
+
+**Migration**: Move your `handle` declarations from your `WebhookHandler` module into your `WebhookController`. Handler modules (for complex handlers) should remain in `lib/my_app/stripe_webhook_handlers/` but are now referenced directly from the controller.
+
 ## [0.2.2] - 2025-12-19
 
 ### Added

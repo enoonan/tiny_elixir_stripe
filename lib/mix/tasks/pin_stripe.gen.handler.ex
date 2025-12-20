@@ -34,35 +34,35 @@ defmodule Mix.Tasks.PinStripe.Gen.Handler.Docs do
     * `--module` - Custom module name for module handlers (default: auto-generated from event name)
     * `--create-handler-module` - Module name to create if no WebhookHandler module exists
 
-    ## Handler Types
+     ## Handler Types
 
-    ### Function Handler
+     ### Function Handler
 
-    Generates an inline function handler in your WebhookHandler module:
+     Generates an inline function handler in your WebhookController:
 
-    ```elixir
-    handle "customer.created", fn event ->
-      # Handle customer.created event
-      :ok
-    end
-    ```
+     ```elixir
+     handle "customer.created", fn event ->
+       # Handle customer.created event
+       :ok
+     end
+     ```
 
-    ### Module Handler
+     ### Module Handler
 
-    Generates a separate module with a `handle_event/1` function:
+     Generates a separate module with a `handle_event/1` function:
 
-    ```elixir
-    # In your WebhookHandler module
-    handle "customer.created", MyApp.StripeWebhookHandlers.CustomerCreated
+     ```elixir
+     # In your WebhookController
+     handle "customer.created", MyAppWeb.StripeWebhookHandlers.CustomerCreated
 
-    # Generated module at lib/my_app/stripe_webhook_handlers/customer_created.ex
-    defmodule MyApp.StripeWebhookHandlers.CustomerCreated do
-      def handle_event(event) do
-        # Handle customer.created event
-        :ok
-      end
-    end
-    ```
+     # Generated module at lib/my_app_web/stripe_webhook_handlers/customer_created.ex
+     defmodule MyAppWeb.StripeWebhookHandlers.CustomerCreated do
+       def handle_event(event) do
+         # Handle customer.created event
+         :ok
+       end
+     end
+     ```
     """
   end
 end
@@ -164,17 +164,17 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp find_or_create_webhook_handler_module(igniter) do
-      # Try to find a module that uses PinStripe.WebhookHandler
-      case find_webhook_handler_module(igniter) do
+      # Try to find a module that uses PinStripe.WebhookController
+      case find_webhook_controller_module(igniter) do
         {igniter, nil} ->
-          create_new_webhook_handler_module(igniter)
+          create_new_webhook_controller_module(igniter)
 
         {igniter, module} ->
           {igniter, module}
       end
     end
 
-    defp create_new_webhook_handler_module(igniter) do
+    defp create_new_webhook_controller_module(igniter) do
       # No module found, check if user wants to create one
       case igniter.args.options[:create_handler_module] do
         nil ->
@@ -182,32 +182,29 @@ if Code.ensure_loaded?(Igniter) do
 
         create_module_name ->
           module = Module.concat([create_module_name])
-          {create_webhook_handler_module(igniter, module), module}
+          {create_webhook_controller_module(igniter, module), module}
       end
     end
 
     defp prompt_for_module_creation(igniter) do
-      default_module =
-        Module.concat([
-          Igniter.Project.Module.module_name_prefix(igniter),
-          "StripeWebhookHandlers"
-        ])
+      web_module = Igniter.Libs.Phoenix.web_module(igniter)
+      default_module = Module.concat([web_module, "StripeWebhookController"])
 
       if Igniter.Util.IO.yes?(
-           "No WebhookHandler module found. Create #{inspect(default_module)}?"
+           "No WebhookController module found. Create #{inspect(default_module)}?"
          ) do
-        {create_webhook_handler_module(igniter, default_module), default_module}
+        {create_webhook_controller_module(igniter, default_module), default_module}
       else
-        raise "Cannot generate handler without a WebhookHandler module"
+        raise "Cannot generate handler without a WebhookController module"
       end
     end
 
-    defp find_webhook_handler_module(igniter) do
+    defp find_webhook_controller_module(igniter) do
       # First search in rewrite buffer (for test environment and pending changes)
       found_in_rewrite =
         igniter.rewrite
         |> Rewrite.sources()
-        |> Enum.find_value(&find_handler_in_source/1)
+        |> Enum.find_value(&find_controller_in_source/1)
 
       case found_in_rewrite do
         nil ->
@@ -222,7 +219,7 @@ if Code.ensure_loaded?(Igniter) do
                 |> Path.dirname()
 
               Path.wildcard(Path.join([lib_path, "**", "*.ex"]))
-              |> Enum.find_value(&find_handler_in_file/1)
+              |> Enum.find_value(&find_controller_in_file/1)
             rescue
               _ -> nil
             end
@@ -234,12 +231,12 @@ if Code.ensure_loaded?(Igniter) do
       end
     end
 
-    defp find_handler_in_source(source) do
+    defp find_controller_in_source(source) do
       path = Rewrite.Source.get(source, :path)
 
       with true <- Path.extname(path) == ".ex",
            content <- Rewrite.Source.get(source, :content),
-           true <- content =~ "use PinStripe.WebhookHandler",
+           true <- content =~ "use PinStripe.WebhookController",
            [_, module_name] <- Regex.run(~r/defmodule\s+([\w.]+)/, content) do
         Module.concat([module_name])
       else
@@ -247,10 +244,10 @@ if Code.ensure_loaded?(Igniter) do
       end
     end
 
-    defp find_handler_in_file(path) do
+    defp find_controller_in_file(path) do
       with true <- File.exists?(path),
            {:ok, content} <- File.read(path),
-           true <- content =~ "use PinStripe.WebhookHandler",
+           true <- content =~ "use PinStripe.WebhookController",
            [_, module_name] <- Regex.run(~r/defmodule\s+([\w.]+)/, content) do
         Module.concat([module_name])
       else
@@ -258,7 +255,7 @@ if Code.ensure_loaded?(Igniter) do
       end
     end
 
-    defp create_webhook_handler_module(igniter, module) do
+    defp create_webhook_controller_module(igniter, module) do
       # Check if module already exists in the rewrite sources
       case Igniter.Project.Module.find_module(igniter, module) do
         {:ok, {igniter, _source, _zipper}} ->
@@ -268,7 +265,7 @@ if Code.ensure_loaded?(Igniter) do
         {:error, _} ->
           # Module doesn't exist, create it
           Igniter.Project.Module.create_module(igniter, module, """
-          use PinStripe.WebhookHandler
+          use PinStripe.WebhookController
           """)
       end
     end
@@ -333,7 +330,7 @@ if Code.ensure_loaded?(Igniter) do
       add_function_handler(igniter, handler_module, event)
     end
 
-    defp generate_handler(igniter, handler_module, event, "module") do
+    defp generate_handler(igniter, controller_module, event, "module") do
       # Generate module handler
       custom_module = igniter.args.options[:module]
 
@@ -343,13 +340,15 @@ if Code.ensure_loaded?(Igniter) do
         else
           # Auto-generate module name from event
           # e.g., "customer.created" -> CustomerCreated
+          # Handler modules live under MyApp.StripeWebhookHandlers, not the controller
+          app_module = Igniter.Project.Module.module_name_prefix(igniter)
           module_suffix = event_to_module_name(event)
-          Module.concat([handler_module, module_suffix])
+          Module.concat([app_module, "StripeWebhookHandlers", module_suffix])
         end
 
       igniter
       |> create_handler_module(handler_module_name, event)
-      |> add_module_handler(handler_module, event, handler_module_name)
+      |> add_module_handler(controller_module, event, handler_module_name)
     end
 
     defp event_to_module_name(event) do
@@ -368,7 +367,7 @@ if Code.ensure_loaded?(Igniter) do
       """
 
       Igniter.Project.Module.find_and_update_module!(igniter, module, fn zipper ->
-        case Igniter.Code.Module.move_to_use(zipper, PinStripe.WebhookHandler) do
+        case Igniter.Code.Module.move_to_use(zipper, PinStripe.WebhookController) do
           {:ok, zipper} ->
             {:ok, Igniter.Code.Common.add_code(zipper, handler_code)}
 
@@ -385,7 +384,7 @@ if Code.ensure_loaded?(Igniter) do
       """
 
       Igniter.Project.Module.find_and_update_module!(igniter, module, fn zipper ->
-        case Igniter.Code.Module.move_to_use(zipper, PinStripe.WebhookHandler) do
+        case Igniter.Code.Module.move_to_use(zipper, PinStripe.WebhookController) do
           {:ok, zipper} ->
             {:ok, Igniter.Code.Common.add_code(zipper, handler_code)}
 

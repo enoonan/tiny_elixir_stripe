@@ -9,9 +9,9 @@ defmodule PinStripe.WebhookControllerTest do
 
   @webhook_secret "whsec_test_secret_key_12345"
 
-  # Test handler module
-  defmodule TestHandler do
-    use PinStripe.WebhookHandler
+  # Test controller using the macro with inline handlers
+  defmodule TestWebhookController do
+    use PinStripe.WebhookController
 
     handle "customer.created", fn event ->
       send(self(), {:handled, "customer.created", event})
@@ -22,11 +22,6 @@ defmodule PinStripe.WebhookControllerTest do
       send(self(), {:handled, "invoice.paid", event})
       {:ok, :processed}
     end
-  end
-
-  # Test controller using the macro
-  defmodule TestWebhookController do
-    use PinStripe.WebhookController, handler: TestHandler
   end
 
   setup do
@@ -265,6 +260,111 @@ defmodule PinStripe.WebhookControllerTest do
 
       assert_raise MatchError, fn ->
         TestWebhookController.create(conn, payload)
+      end
+    end
+  end
+
+  describe "DSL definition" do
+    test "defines handlers using handle/2 with function" do
+      handlers = PinStripe.WebhookHandler.Info.handlers(TestWebhookController)
+
+      assert length(handlers) == 2
+
+      customer_created = Enum.find(handlers, &(&1.event_type == "customer.created"))
+      assert customer_created
+      assert is_function(customer_created.handler, 1)
+    end
+
+    test "defines handlers using handle/2 with module" do
+      # Create a test controller with a module handler
+      defmodule TestModuleHandler do
+        def handle_event(event) do
+          send(self(), {:module_handled, event})
+          :ok
+        end
+      end
+
+      defmodule TestControllerWithModuleHandler do
+        use PinStripe.WebhookController
+
+        handle "customer.updated", TestModuleHandler
+      end
+
+      handlers = PinStripe.WebhookHandler.Info.handlers(TestControllerWithModuleHandler)
+
+      customer_updated = Enum.find(handlers, &(&1.event_type == "customer.updated"))
+      assert customer_updated
+      assert customer_updated.handler == TestModuleHandler
+    end
+  end
+
+  describe "handle_event/2 dispatching" do
+    test "dispatches to function handler" do
+      event = %{"id" => "evt_123", "type" => "customer.created", "data" => %{}}
+
+      assert :ok = TestWebhookController.handle_event("customer.created", event)
+      assert_received {:handled, "customer.created", ^event}
+    end
+
+    test "dispatches to module handler" do
+      defmodule ModuleHandlerForDispatch do
+        def handle_event(event) do
+          send(self(), {:module_dispatched, event})
+          :ok
+        end
+      end
+
+      defmodule TestControllerForDispatch do
+        use PinStripe.WebhookController
+
+        handle "test.event", ModuleHandlerForDispatch
+      end
+
+      event = %{"id" => "evt_456", "type" => "test.event", "data" => %{}}
+
+      assert :ok = TestControllerForDispatch.handle_event("test.event", event)
+      assert_received {:module_dispatched, ^event}
+    end
+
+    test "returns handler result" do
+      event = %{"id" => "evt_789", "type" => "invoice.paid", "data" => %{}}
+
+      assert {:ok, :processed} = TestWebhookController.handle_event("invoice.paid", event)
+      assert_received {:handled, "invoice.paid", ^event}
+    end
+
+    test "returns :ok for unknown event types" do
+      event = %{"id" => "evt_999", "type" => "unknown.event", "data" => %{}}
+
+      assert :ok = TestWebhookController.handle_event("unknown.event", event)
+    end
+  end
+
+  describe "handler error handling" do
+    defmodule ErrorHandlerController do
+      use PinStripe.WebhookController
+
+      handle "will.raise", fn _event ->
+        raise "Something went wrong"
+      end
+
+      handle "will.error", fn _event ->
+        {:error, :processing_failed}
+      end
+    end
+
+    test "propagates errors from handlers" do
+      event = %{"type" => "will.error"}
+
+      assert {:error, :processing_failed} =
+               ErrorHandlerController.handle_event("will.error", event)
+    end
+
+    test "propagates exceptions from handlers" do
+      event = %{"type" => "will.raise"}
+
+      assert_raise RuntimeError, "Something went wrong", fn ->
+        ErrorHandlerController.handle_event("will.raise", event)
       end
     end
   end

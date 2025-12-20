@@ -4,15 +4,23 @@ defmodule PinStripe.WebhookController do
 
   This module provides a `use` macro that injects webhook handling functionality
   into your Phoenix controller. It automatically verifies webhook signatures and
-  forwards events to your handler module.
+  dispatches events to handler functions defined using the `handle/2` macro.
 
   ## Usage
 
-  Create a controller in your Phoenix app:
+  Create a controller in your Phoenix app and define event handlers:
 
       defmodule MyAppWeb.StripeWebhookController do
-        use PinStripe.WebhookController, 
-          handler: MyApp.StripeWebhookHandlers
+        use PinStripe.WebhookController
+
+        handle "customer.created", fn event ->
+          # Process customer.created event
+          customer = event["data"]["object"]
+          IO.inspect(customer, label: "New customer")
+          :ok
+        end
+
+        handle "invoice.paid", MyApp.InvoicePaidHandler
       end
 
   Then add it to your router:
@@ -35,95 +43,43 @@ defmodule PinStripe.WebhookController do
   This controller automatically verifies webhook signatures using the
   `stripe-signature` header. Invalid signatures are rejected with a 400 response.
 
-   The raw request body must be available in `conn.assigns.raw_body` for signature
-   verification to work. Use PinStripe.ParsersWithRawBody in your endpoint.
+  The raw request body must be available in `conn.assigns.raw_body` for signature
+  verification to work. Use PinStripe.ParsersWithRawBody in your endpoint.
 
-  ## Handler Module
+  ## Handler Functions
 
-   The handler module should use `PinStripe.WebhookHandler` and define
-   event handlers:
+  Handlers can be either:
+  - Anonymous functions that take the event as an argument
+  - Module names that implement a `handle_event/1` function
 
-      defmodule MyApp.StripeWebhookHandlers do
-        use PinStripe.WebhookHandler
+  ### Function Handler Example
 
-        handle "customer.created", fn event ->
-          # Process customer.created event
-          :ok
-        end
+      handle "customer.created", fn event ->
+        # Process customer.created event
+        :ok
+      end
 
-        handle "invoice.paid", fn event ->
-          # Process invoice.paid event
+  ### Module Handler Example
+
+      handle "invoice.paid", MyApp.InvoicePaidHandler
+
+  Then create the handler module:
+
+      defmodule MyApp.InvoicePaidHandler do
+        def handle_event(event) do
+          invoice = event["data"]["object"]
+          # Process the paid invoice
           :ok
         end
       end
   """
 
-  defmacro __using__(opts) do
-    handler = Keyword.fetch!(opts, :handler)
-
-    quote location: :keep do
+  defmacro __using__(_opts) do
+    quote do
+      use PinStripe.WebhookHandler
       use Phoenix.Controller, formats: [:json]
       import Plug.Conn
       require Logger
-
-      @handler unquote(handler)
-
-      @doc """
-      Handles incoming Stripe webhook events.
-
-      Expects a JSON payload with at least a "type" field indicating the event type.
-      """
-      def create(conn, %{"type" => type} = params) do
-        conn = verify_signature(conn)
-
-        if conn.halted do
-          conn
-        else
-          Logger.info("[#{inspect(__MODULE__)}] Received webhook: #{type}")
-
-          # Forward to handler module
-          @handler.handle_event(type, params)
-
-          send_resp(conn, 200, "")
-        end
-      end
-
-      def create(conn, _params) do
-        Logger.warning("[#{inspect(__MODULE__)}] Received webhook without type field")
-        send_resp(conn, 400, "missing event type")
-      end
-
-      defp verify_signature(conn) do
-        secret = Application.fetch_env!(:pin_stripe, :stripe_webhook_secret)
-        "whsec_" <> _ = secret
-
-        with {:ok, signature} <- get_signature(conn),
-             raw_body <- reconstruct_raw_body(conn),
-             :ok <- PinStripe.WebhookSignature.verify(raw_body, signature, secret) do
-          conn
-        else
-          {:error, error} ->
-            Logger.error("[#{inspect(__MODULE__)}] Invalid signature: #{error}")
-
-            conn
-            |> send_resp(400, "invalid signature")
-            |> halt()
-        end
-      end
-
-      defp get_signature(conn) do
-        case get_req_header(conn, "stripe-signature") do
-          [signature] -> {:ok, signature}
-          _ -> {:error, "no signature"}
-        end
-      end
-
-      defp reconstruct_raw_body(conn) do
-        # Chunks are prepended, so reverse before concatenating
-        conn.assigns.raw_body
-        |> Enum.reverse()
-        |> IO.iodata_to_binary()
-      end
     end
   end
 end

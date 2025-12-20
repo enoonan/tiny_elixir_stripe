@@ -19,16 +19,15 @@ defmodule Mix.Tasks.PinStripe.Install.Docs do
     This installer will:
 
     1. Replace Plug.Parsers with PinStripe.ParsersWithRawBody in your Phoenix endpoint
-    2. Create a stub WebhookHandler module in lib/{app} for defining event handlers
-    3. Generate a StripeWebhookController in lib/{app}_web that uses PinStripe.WebhookController
-    4. Add a webhook route to your router that points to the generated controller
-    5. Add :pin_stripe to import_deps in .formatter.exs for DSL formatting support
+    2. Generate a StripeWebhookController in lib/{app}_web with example event handlers
+    3. Add a webhook route to your router that points to the generated controller
+    4. Add :pin_stripe to import_deps in .formatter.exs for DSL formatting support
 
     The ParsersWithRawBody plug caches the raw request body for webhook signature verification,
     as required by Stripe's webhook security.
 
-    The generated controller automatically handles signature verification and forwards events
-    to your WebhookHandler module.
+    The generated controller automatically handles signature verification and dispatches events
+    to handler functions you define using the `handle` DSL.
 
     ## Example
 
@@ -80,7 +79,6 @@ if Code.ensure_loaded?(Igniter) do
 
       igniter
       |> replace_plug_parsers()
-      |> create_webhook_handler_stub()
       |> create_webhook_controller()
       |> add_webhook_route(webhook_path)
       |> add_formatter_config()
@@ -154,107 +152,34 @@ if Code.ensure_loaded?(Igniter) do
     # Note: The controller will be created in lib/{app}_web/ directory, not in lib/{app}_web/controllers/
     # You can manually move it to the controllers directory if desired.
     defp create_webhook_controller(igniter) do
-      # Get the handler module that was created or found
-      {igniter, handler_module} = get_or_create_handler_module(igniter)
-
       # Determine the controller module name
       web_module = Igniter.Libs.Phoenix.web_module(igniter)
       controller_module = Module.concat([web_module, "StripeWebhookController"])
 
-      # Create the controller using standard Igniter module creation
+      # Create the controller with example handlers
       Igniter.Project.Module.create_module(igniter, controller_module, """
-      use PinStripe.WebhookController, 
-        handler: #{inspect(handler_module)}
+      use PinStripe.WebhookController
+
+      # Add your webhook event handlers here using the handle/2 macro
+      #
+      # Function handler example:
+      # handle "customer.created", fn event ->
+      #   customer = event["data"]["object"]
+      #   IO.inspect(customer, label: "New customer")
+      #   :ok
+      # end
+      #
+      # Module handler example:
+      # handle "invoice.paid", MyApp.InvoicePaidHandler
+      #
+      # For more Stripe event types, see: https://stripe.com/docs/api/events/types
+      #
+      # To generate a handler stub, run:
+      #   mix pin_stripe.gen.handler <event_name>
+      #
+      # Example:
+      #   mix pin_stripe.gen.handler customer.subscription.updated
       """)
-    end
-
-    # Get or create the handler module and return it
-    defp get_or_create_handler_module(igniter) do
-      case find_existing_webhook_handler(igniter) do
-        {igniter, nil} ->
-          # No existing handler found, create a new one
-          module_name =
-            Module.concat([
-              Igniter.Project.Module.module_name_prefix(igniter),
-              "StripeWebhookHandlers"
-            ])
-
-          igniter =
-            Igniter.Project.Module.create_module(igniter, module_name, """
-            @moduledoc \"\"\"
-            Handles Stripe webhook events.
-
-            Add handlers for Stripe events using the `handle/2` macro.
-
-            ## Function Handler Example
-
-                handle "customer.created", fn event ->
-                  # Handle customer.created event
-                  customer = event.data.object
-                  IO.inspect(customer, label: "New customer")
-                  :ok
-                end
-
-            ## Module Handler Example
-
-                handle "invoice.paid", MyApp.InvoicePaidHandler
-
-            Then create the handler module:
-
-                defmodule MyApp.InvoicePaidHandler do
-                  def handle_event(event) do
-                    invoice = event.data.object
-                    # Process the paid invoice
-                    :ok
-                  end
-                end
-
-            ## Available Events
-
-            Run `mix pin_stripe.gen.handler <event_name>` to generate a handler
-            for a specific Stripe event. For example:
-
-                mix pin_stripe.gen.handler customer.subscription.updated
-
-            \"\"\"
-            use PinStripe.WebhookHandler
-            """)
-
-          {igniter, module_name}
-
-        {igniter, existing_module} ->
-          # Module already exists, return it
-          {igniter, existing_module}
-      end
-    end
-
-    # Create a stub WebhookHandler module in lib/{app}
-    defp create_webhook_handler_stub(igniter) do
-      {igniter, _module} = get_or_create_handler_module(igniter)
-      igniter
-    end
-
-    defp find_existing_webhook_handler(igniter) do
-      # Search all .ex files in the project for modules using PinStripe.WebhookHandler
-      found_module =
-        igniter.rewrite
-        |> Rewrite.sources()
-        |> Enum.find_value(&find_handler_in_source/1)
-
-      {igniter, found_module}
-    end
-
-    defp find_handler_in_source(source) do
-      path = Rewrite.Source.get(source, :path)
-
-      with true <- Path.extname(path) == ".ex",
-           content <- Rewrite.Source.get(source, :content),
-           true <- content =~ "use PinStripe.WebhookHandler",
-           [_, module_name] <- Regex.run(~r/defmodule\s+([\w.]+)/, content) do
-        Module.concat([module_name])
-      else
-        _ -> nil
-      end
     end
 
     # Add the webhook route to the router
