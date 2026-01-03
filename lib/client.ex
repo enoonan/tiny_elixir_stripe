@@ -222,8 +222,11 @@ defmodule PinStripe.Client do
   def create(entity, params, options \\ []) when is_atom(entity) and is_map(params) do
     case entity_to_path(entity) do
       {:ok, path} ->
+        encoded_params = encode_nested_params(params)
+
         new(url: path)
-        |> Req.merge(form: params, method: :post)
+        |> Req.merge(body: encoded_params, method: :post)
+        |> Req.Request.put_header("content-type", "application/x-www-form-urlencoded")
         |> Req.request(options)
         |> handle_response()
 
@@ -252,9 +255,11 @@ defmodule PinStripe.Client do
   """
   def update(id, params, options \\ []) when is_binary(id) and is_map(params) do
     url = parse_url(id)
+    encoded_params = encode_nested_params(params)
 
     new(url: url)
-    |> Req.merge(form: params, method: :post)
+    |> Req.merge(body: encoded_params, method: :post)
+    |> Req.Request.put_header("content-type", "application/x-www-form-urlencoded")
     |> Req.request(options)
     |> handle_response()
   end
@@ -492,4 +497,64 @@ defmodule PinStripe.Client do
   def entity_to_path(:events), do: {:ok, "/events"}
   def entity_to_path(:checkout_sessions), do: {:ok, "/checkout/sessions"}
   def entity_to_path(_), do: {:error, :unrecognized_entity_type}
+
+  @doc false
+  # Encodes nested parameters into URL-encoded form data using bracket notation.
+  #
+  # The Stripe API expects nested parameters in bracket notation:
+  #   %{metadata: %{key: "value"}} -> "metadata[key]=value"
+  #   %{recurring: %{interval: "month"}} -> "recurring[interval]=month"
+  #
+  # This function flattens nested maps and then encodes them using URI.encode_query/1.
+  defp encode_nested_params(params) when is_map(params) do
+    params
+    |> flatten_params()
+    |> URI.encode_query()
+  end
+
+  # Recursively flattens nested maps and lists into bracket notation keys.
+  #
+  # Examples:
+  #   %{email: "test@example.com", metadata: %{key: "value"}}
+  #   -> %{"email" => "test@example.com", "metadata[key]" => "value"}
+  #
+  #   %{items: [%{price: "price_123"}]}
+  #   -> %{"items[0][price]" => "price_123"}
+  defp flatten_params(params, prefix \\ nil) do
+    Enum.reduce(params, %{}, fn {key, value}, acc ->
+      string_key = to_string(key)
+      full_key = if prefix, do: "#{prefix}[#{string_key}]", else: string_key
+
+      case value do
+        value when is_list(value) ->
+          Map.merge(acc, flatten_list(value, full_key))
+
+        value when is_map(value) ->
+          Map.merge(acc, flatten_params(value, full_key))
+
+        value ->
+          Map.put(acc, full_key, value)
+      end
+    end)
+  end
+
+  # Flattens lists into indexed bracket notation.
+  defp flatten_list(list, prefix) do
+    list
+    |> Enum.with_index()
+    |> Enum.reduce(%{}, fn {value, index}, acc ->
+      indexed_key = "#{prefix}[#{index}]"
+
+      case value do
+        value when is_map(value) ->
+          Map.merge(acc, flatten_params(value, indexed_key))
+
+        value when is_list(value) ->
+          Map.merge(acc, flatten_list(value, indexed_key))
+
+        value ->
+          Map.put(acc, indexed_key, value)
+      end
+    end)
+  end
 end
