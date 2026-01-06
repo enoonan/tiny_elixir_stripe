@@ -24,3 +24,5 @@ tiny_elixir_stripe-*.tar
 
 # Test fixtures from fixture generation tests
 /test/fixtures/stripe_test/
+
+.claude

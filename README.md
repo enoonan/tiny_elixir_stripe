@@ -54,7 +54,7 @@ Add to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:pin_stripe, "~> 0.2"}
+    {:pin_stripe, "~> 0.3"}
   ]
 end
 ```

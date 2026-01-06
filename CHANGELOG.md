@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-01-06
+
+### Fixed 
+
+- **Nested parameters cause Protocol.UndefinedError**: [issue 2](https://github.com/enoonan/pin_stripe/issues/2) closed by [PR 3](https://github.com/enoonan/pin_stripe/pull/3) from [neilberkman](https://github.com/neilberkman). Thank you Neil! 🎉
+
 ## [0.3.0] - 2025-12-19
 
 ### Changed
